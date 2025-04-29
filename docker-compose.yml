@@ -6,6 +6,8 @@
       dockerfile: LoadBalancer/Dockerfile
     ports:
       - "8080:8080"
+    volumes:
+      - ./LoadBalancer/config.json:/app/config.json
     depends_on:
       - server1
       - server2

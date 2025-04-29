@@ -1,5 +1,6 @@
 using LoadBalancer.Configurations;
 using LoadBalancer.Strategies;
+using LoadBalancer.Strategies.Implementations;
 using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -15,6 +16,7 @@ builder.Services.AddSingleton<ILoadBalancerStrategy>(provider =>
     return config.Strategy switch
     {
         "RoundRobin" => new RoundRobinStrategy(config.Servers),
+        "WeightedRoundRobin" => new WeightedRoundRobinStrategy(config.Servers),
         _ => new RoundRobinStrategy(config.Servers)
     };
 });

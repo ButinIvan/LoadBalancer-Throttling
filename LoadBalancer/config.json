@@ -1,10 +1,19 @@
 {
   "LoadBalancer" : {
-    "Strategy": "RoundRobin",
+    "Strategy": "WeightedRoundRobin",
     "Servers": [
-      {"Url": "http://server1:5000"},
-      {"Url": "http://server2:5001"},
-      {"Url": "http://server3:5002"}
+      {
+        "Url": "http://server1:5000",
+        "Weight": 2
+      },
+      {
+        "Url": "http://server2:5001",
+        "Weight": 3
+      },
+      {
+        "Url": "http://server3:5002",
+        "Weight" : 1
+      }
     ]
   }
 }

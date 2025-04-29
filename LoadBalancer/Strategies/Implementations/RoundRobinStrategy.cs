@@ -1,6 +1,6 @@
 using LoadBalancer.Configurations;
 
-namespace LoadBalancer.Strategies;
+namespace LoadBalancer.Strategies.Implementations;
 
 public class RoundRobinStrategy : ILoadBalancerStrategy
 {
