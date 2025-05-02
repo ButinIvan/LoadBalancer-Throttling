@@ -1,18 +1,79 @@
 {
+//  "LoadBalancer" : {
+//    "Strategy": "RoundRobin",
+//    "Servers": [
+//      {
+//        "Url": "http://server1:5000"
+//      },
+//      {
+//        "Url": "http://server2:5001"
+//      },
+//      {
+//        "Url": "http://server3:5002"
+//      }
+//    ]
+//  },
+//  
+//  "LoadBalancer" : {
+//    "Strategy": "WeightedRoundRobin",
+//    "Servers": [
+//      {
+//        "Url": "http://server1:5000",
+//        "Weight": 2
+//      },
+//      {
+//        "Url": "http://server2:5001",
+//        "Weight": 3
+//      },
+//      {
+//        "Url": "http://server3:5002",
+//        "Weight" : 1
+//      }
+//    ]
+//  },
+  
+//  "LoadBalancer" : {
+//    "Strategy": "StickyRoundRobin",
+//    "Duration": "00:00:30",
+//    "Servers": [
+//      {
+//        "Url": "http://server1:5000"
+//      },
+//      {
+//        "Url": "http://server2:5001"
+//      },
+//      {
+//        "Url": "http://server3:5002"
+//      }
+//    ]
+//  },
+
+//  "LoadBalancer" : {
+//    "Strategy": "IpHash",
+//    "Servers": [
+//      {
+//        "Url": "http://server1:5000"
+//      },
+//      {
+//        "Url": "http://server2:5001"
+//      },
+//      {
+//        "Url": "http://server3:5002"
+//      }
+//    ]
+//  },
+  
   "LoadBalancer" : {
-    "Strategy": "WeightedRoundRobin",
+    "Strategy": "UrlHash",
     "Servers": [
       {
-        "Url": "http://server1:5000",
-        "Weight": 2
+        "Url": "http://server1:5000"
       },
       {
-        "Url": "http://server2:5001",
-        "Weight": 3
+        "Url": "http://server2:5001"
       },
       {
-        "Url": "http://server3:5002",
-        "Weight" : 1
+        "Url": "http://server3:5002"
       }
     ]
   }

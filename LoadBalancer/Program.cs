@@ -6,6 +6,7 @@ using Microsoft.Extensions.Options;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddHttpClient();
+builder.Services.AddHttpContextAccessor();
 builder.Configuration.AddJsonFile("config.json", optional: false, reloadOnChange: true);
 builder.Services.Configure<LoadBalancerConfig>(
     builder.Configuration.GetSection("LoadBalancer"));
@@ -17,6 +18,16 @@ builder.Services.AddSingleton<ILoadBalancerStrategy>(provider =>
     {
         "RoundRobin" => new RoundRobinStrategy(config.Servers),
         "WeightedRoundRobin" => new WeightedRoundRobinStrategy(config.Servers),
+        "StickyRoundRobin" => new StickyRoundRobinStrategy(
+            config.Servers,
+            provider.GetRequiredService<IHttpContextAccessor>(),
+            config.Duration),
+        "IpHash" => new IpHashStrategy(
+            config.Servers,
+            provider.GetRequiredService<IHttpContextAccessor>()),
+        "UrlHash" => new UrlHashStrategy(
+            config.Servers,
+            provider.GetRequiredService<IHttpContextAccessor>()),
         _ => new RoundRobinStrategy(config.Servers)
     };
 });
