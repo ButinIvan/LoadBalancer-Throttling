@@ -45,8 +45,7 @@ builder.Services.AddSingleton<ILoadBalancerStrategy>(provider =>
             config.Duration),
         "IpHash" => new HashBasedStrategy(
             config.Servers,
-            httpAccessor,
-            HashBasedStrategy.HashMode.Ip),
+            httpAccessor),
         "UrlHash" => new HashBasedStrategy(
             config.Servers,
             httpAccessor,
