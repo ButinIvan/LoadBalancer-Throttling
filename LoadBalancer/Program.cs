@@ -14,20 +14,23 @@ builder.Services.Configure<LoadBalancerConfig>(
 builder.Services.AddSingleton<ILoadBalancerStrategy>(provider =>
 {
     var config = provider.GetRequiredService<IOptions<LoadBalancerConfig>>().Value;
+    var httpAccessor = provider.GetRequiredService<IHttpContextAccessor>();
     return config.Strategy switch
     {
         "RoundRobin" => new RoundRobinStrategy(config.Servers),
         "WeightedRoundRobin" => new WeightedRoundRobinStrategy(config.Servers),
         "StickyRoundRobin" => new StickyRoundRobinStrategy(
             config.Servers,
-            provider.GetRequiredService<IHttpContextAccessor>(),
+            httpAccessor,
             config.Duration),
-        "IpHash" => new IpHashStrategy(
+        "IpHash" => new HashBasedStrategy(
             config.Servers,
-            provider.GetRequiredService<IHttpContextAccessor>()),
-        "UrlHash" => new UrlHashStrategy(
+            httpAccessor,
+            HashBasedStrategy.HashMode.Ip),
+        "UrlHash" => new HashBasedStrategy(
             config.Servers,
-            provider.GetRequiredService<IHttpContextAccessor>()),
+            httpAccessor,
+            HashBasedStrategy.HashMode.Url),
         _ => new RoundRobinStrategy(config.Servers)
     };
 });
