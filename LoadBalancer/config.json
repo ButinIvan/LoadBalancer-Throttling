@@ -32,9 +32,39 @@
 //    ]
 //  },
   
+//  "LoadBalancer" : {
+//    "Strategy": "StickyRoundRobin",
+//    "Duration": "00:00:30",
+//    "Servers": [
+//      {
+//        "Url": "http://server1:5000"
+//      },
+//      {
+//        "Url": "http://server2:5001"
+//      },
+//      {
+//        "Url": "http://server3:5002"
+//      }
+//    ]
+//  },
+
+//  "LoadBalancer" : {
+//    "Strategy": "IpHash",
+//    "Servers": [
+//      {
+//        "Url": "http://server1:5000"
+//      },
+//      {
+//        "Url": "http://server2:5001"
+//      },
+//      {
+//        "Url": "http://server3:5002"
+//      }
+//    ]
+//  },
+  
   "LoadBalancer" : {
-    "Strategy": "StickyRoundRobin",
-    "Duration": "00:00:30",
+    "Strategy": "UrlHash",
     "Servers": [
       {
         "Url": "http://server1:5000"
