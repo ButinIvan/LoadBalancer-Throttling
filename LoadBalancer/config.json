@@ -1,18 +1,23 @@
 {
-//  "LoadBalancer" : {
-//    "Strategy": "RoundRobin",
-//    "Servers": [
-//      {
-//        "Url": "http://server1:5000"
-//      },
-//      {
-//        "Url": "http://server2:5001"
-//      },
-//      {
-//        "Url": "http://server3:5002"
-//      }
-//    ]
-//  },
+  "LoadBalancer" : {
+    "Strategy": "RoundRobin",
+    "Servers": [
+      {
+        "Url": "http://server1:5000"
+      },
+      {
+        "Url": "http://server2:5001"
+      },
+      {
+        "Url": "http://server3:5002"
+      }
+    ]
+  },
+  "Throttling" : {
+    "Strategy": "RejectingSlidingWindow",
+    "RequestLimit": 1,
+    "WindowSize": "00:00:02"
+  }
 //  
 //  "LoadBalancer" : {
 //    "Strategy": "WeightedRoundRobin",
@@ -32,19 +37,19 @@
 //    ]
 //  },
   
-  "LoadBalancer" : {
-    "Strategy": "StickyRoundRobin",
-    "Duration": "00:00:30",
-    "Servers": [
-      {
-        "Url": "http://server1:5000"
-      },
-      {
-        "Url": "http://server2:5001"
-      },
-      {
-        "Url": "http://server3:5002"
-      }
-    ]
-  }
+//  "LoadBalancer" : {
+//    "Strategy": "StickyRoundRobin",
+//    "Duration": "00:00:30",
+//    "Servers": [
+//      {
+//        "Url": "http://server1:5000"
+//      },
+//      {
+//        "Url": "http://server2:5001"
+//      },
+//      {
+//        "Url": "http://server3:5002"
+//      }
+//    ]
+//  }
 }
