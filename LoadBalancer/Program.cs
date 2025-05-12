@@ -1,7 +1,10 @@
 using System.Diagnostics;
+using System.Net.Quic;
 using LoadBalancer.Configurations;
 using LoadBalancer.Strategies;
 using LoadBalancer.Strategies.Implementations;
+using LoadBalancer.Throttling;
+using LoadBalancer.Throttling.Implementations;
 using Microsoft.Extensions.Options;
 using Serilog;
 using Serilog.Enrichers.Span;
@@ -36,6 +39,23 @@ try
     builder.Configuration.AddJsonFile("config.json", optional: false, reloadOnChange: true);
     builder.Services.Configure<LoadBalancerConfig>(
         builder.Configuration.GetSection("LoadBalancer"));
+    builder.Services.Configure<ThrottlingConfig>(
+        builder.Configuration.GetSection("Throttling"));
+
+    builder.Services.AddSingleton<IThrottlingStrategy>(provider =>
+    {
+        var config = provider.GetRequiredService<IOptions<ThrottlingConfig>>().Value;
+
+        return config.Strategy switch
+        { 
+            "RejectingSlidingWindow" => new RejectingSlidingWindowStrategy(
+                config.WindowSize,
+                config.RequestLimit),
+            _ => new RejectingSlidingWindowStrategy(
+                config.WindowSize,
+                config.RequestLimit),
+        };
+    });
 
     builder.Services.AddSingleton<ILogger>(provider => Log.Logger);
     
@@ -112,6 +132,20 @@ try
                 statusCode: StatusCodes.Status502BadGateway);
         }
     }
+
+    app.Use(async (context, next) =>
+    {
+        var throttlingStrategy = context.RequestServices.GetRequiredService<IThrottlingStrategy>();
+
+        if (!throttlingStrategy.TryProcessRequest())
+        {
+            context.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+            await context.Response.WriteAsync("Сервер перегружен, попробуйте еще раз позже");
+            return;
+        }
+
+        await next();
+    });
 
     app.MapGet("/", HandleRequest);
 
