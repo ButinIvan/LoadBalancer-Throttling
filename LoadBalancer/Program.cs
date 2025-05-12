@@ -1,62 +1,127 @@
+using System.Diagnostics;
 using LoadBalancer.Configurations;
 using LoadBalancer.Strategies;
 using LoadBalancer.Strategies.Implementations;
 using Microsoft.Extensions.Options;
+using Serilog;
+using Serilog.Enrichers.Span;
+using Serilog.Events;
+using ILogger = Serilog.ILogger;
 
-var builder = WebApplication.CreateBuilder(args);
+Log.Logger = new LoggerConfiguration()
+    .MinimumLevel.Information()
+    .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
+    .Enrich.FromLogContext()
+    .Enrich.WithSpan()
+    .WriteTo.Console(outputTemplate: 
+        "{Timestamp:HH:mm:ss} [{Level}] TraceId: {TraceId} | {Message}{NewLine}{Exception}")
+    .WriteTo.Seq("http://localhost:5341")
+    .CreateBootstrapLogger();
 
-builder.Services.AddHttpClient();
-builder.Services.AddHttpContextAccessor();
-builder.Configuration.AddJsonFile("config.json", optional: false, reloadOnChange: true);
-builder.Services.Configure<LoadBalancerConfig>(
-    builder.Configuration.GetSection("LoadBalancer"));
-
-builder.Services.AddSingleton<ILoadBalancerStrategy>(provider =>
+try
 {
-    var config = provider.GetRequiredService<IOptions<LoadBalancerConfig>>().Value;
-    var httpAccessor = provider.GetRequiredService<IHttpContextAccessor>();
-    return config.Strategy switch
-    {
-        "RoundRobin" => new RoundRobinStrategy(config.Servers),
-        "WeightedRoundRobin" => new WeightedRoundRobinStrategy(config.Servers),
-        "StickyRoundRobin" => new StickyRoundRobinStrategy(
-            config.Servers,
-            httpAccessor,
-            config.Duration),
-        "IpHash" => new HashBasedStrategy(
-            config.Servers,
-            httpAccessor,
-            HashBasedStrategy.HashMode.Ip),
-        "UrlHash" => new HashBasedStrategy(
-            config.Servers,
-            httpAccessor,
-            HashBasedStrategy.HashMode.Url),
-        _ => new RoundRobinStrategy(config.Servers)
-    };
-});
+    var builder = WebApplication.CreateBuilder(args);
 
-var app = builder.Build();
+    builder.Host.UseSerilog((context, services, configuration) =>
+        configuration
+            .ReadFrom.Configuration(context.Configuration)
+            .ReadFrom.Services(services)
+            .Enrich.FromLogContext()
+            .Enrich.WithSpan()
+            .WriteTo.Console()
+            .WriteTo.Seq("http://localhost:5341"));
 
-async Task<IResult> HandleRequest(
-    HttpContext context,
-    ILoadBalancerStrategy strategy,
-    HttpClient httpClient)
-{
-    var server = strategy.GetNextServer();
-    try
+    builder.Services.AddHttpClient();
+    builder.Services.AddHttpContextAccessor();
+    builder.Configuration.AddJsonFile("config.json", optional: false, reloadOnChange: true);
+    builder.Services.Configure<LoadBalancerConfig>(
+        builder.Configuration.GetSection("LoadBalancer"));
+
+    builder.Services.AddSingleton<ILogger>(provider => Log.Logger);
+    
+    builder.Services.AddSingleton<ILoadBalancerStrategy>(provider =>
     {
-        var response = await httpClient.GetAsync(server.Url);
-        response.EnsureSuccessStatusCode();
-        return Results.Text(await response.Content.ReadAsStringAsync());
-    }
-    catch (HttpRequestException ex)
+        var config = provider.GetRequiredService<IOptions<LoadBalancerConfig>>().Value;
+        var httpAccessor = provider.GetRequiredService<IHttpContextAccessor>();
+        var logger = provider.GetRequiredService<ILogger>();
+        
+        return config.Strategy switch
+        {
+            "RoundRobin" => new RoundRobinStrategy(
+                config.Servers,
+                logger),
+            "WeightedRoundRobin" => new WeightedRoundRobinStrategy(
+                config.Servers,
+                logger),
+            "StickyRoundRobin" => new StickyRoundRobinStrategy(
+                config.Servers,
+                httpAccessor,
+                config.Duration,
+                logger),
+            "IpHash" => new HashBasedStrategy(
+                config.Servers,
+                httpAccessor,
+                logger),
+            "UrlHash" => new HashBasedStrategy(
+                config.Servers,
+                httpAccessor,
+                logger,
+                HashBasedStrategy.HashMode.Url),
+            _ => new RoundRobinStrategy(
+                config.Servers,
+                logger)
+        };
+    });
+
+    var app = builder.Build();
+
+    app.UseSerilogRequestLogging(options =>
     {
-        return Results.Problem(
-            detail: $"Ошибка соединения с сервером {server.Url}: {ex.Message}",
-            statusCode: StatusCodes.Status502BadGateway);
+        options.EnrichDiagnosticContext = ((context, httpContext) =>
+        {
+            context.Set("ClientIp", httpContext.Connection.RemoteIpAddress?.ToString());
+            context.Set("UserAgent", httpContext.Request.Headers.UserAgent);
+        });
+    });
+
+    async Task<IResult> HandleRequest(
+        HttpContext context,
+        ILoadBalancerStrategy strategy,
+        HttpClient httpClient,
+        ILogger<Program> logger)
+    {
+        using var activity = Activity.Current?.Source.StartActivity("LoadBalancer.HandleRequest");
+        
+        logger.LogInformation("Начало обработки запроса {Path}", context.Request.Path);
+        
+        var server = strategy.GetNextServer();
+        logger.LogInformation("Выбран сервер: {ServerUrl}", server.Url);
+        
+        try
+        {
+            var response = await httpClient.GetAsync(server.Url);
+            response.EnsureSuccessStatusCode();
+            logger.LogInformation("Успешный ответ от сервера {ServerUrl}", server.Url);
+            return Results.Text(await response.Content.ReadAsStringAsync());
+        }
+        catch (HttpRequestException e)
+        {
+            logger.LogError(e, "Ошибка соединения с сервером {server.Url}", server.Url);
+            return Results.Problem(
+                detail: $"Ошибка соединения с сервером {server.Url}: {e.Message}",
+                statusCode: StatusCodes.Status502BadGateway);
+        }
     }
+
+    app.MapGet("/", HandleRequest);
+
+    app.Run("http://0.0.0.0:8080");
 }
-
-app.MapGet("/", HandleRequest);
-
-app.Run("http://0.0.0.0:8080");
+catch (Exception e)
+{
+    Log.Fatal(e, "Работа приложения завершилась");
+}
+finally
+{
+    Log.CloseAndFlush();
+}

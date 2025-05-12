@@ -1,4 +1,6 @@
-﻿using LoadBalancer.Configurations;
+﻿using System.Diagnostics;
+using LoadBalancer.Configurations;
+using ILogger = Serilog.ILogger;
 
 namespace LoadBalancer.Strategies.Implementations;
 
@@ -11,8 +13,9 @@ public class WeightedRoundRobinStrategy : ILoadBalancerStrategy
     private readonly int _maxWeight;
     private readonly int _gcd;
     private readonly object _lock = new();
+    private readonly ILogger _logger;
 
-    public WeightedRoundRobinStrategy(ServerConfig[] servers)
+    public WeightedRoundRobinStrategy(ServerConfig[] servers, ILogger logger)
     {
         if (servers == null || servers.Length == 0)
             throw new ArgumentException("Servers list cannot be null or empty");
@@ -21,28 +24,50 @@ public class WeightedRoundRobinStrategy : ILoadBalancerStrategy
         _weights = servers.Select(s => s.Weight > 0 ? s.Weight : 1).ToArray();
         _maxWeight = _weights.Max();
         _gcd = CalculateGCD(_weights);
+        _logger = logger;
+        
+        _logger.Debug("Initialized with {ServerCount} servers, MaxWeight: {MaxWeight}, GCD: {GCD}",
+            servers.Length, _maxWeight, _gcd);
     }
 
     public ServerConfig GetNextServer()
     {
         lock (_lock)
         {
-            while (true)
+            try
             {
-                _currentIndex = (_currentIndex + 1) % _servers.Length;
-                if (_currentIndex == 0)
+                while (true)
                 {
-                    _currentWeight -= _gcd;
-                    if (_currentWeight <= 0)
+                    _currentIndex = (_currentIndex + 1) % _servers.Length;
+                    if (_currentIndex == 0)
                     {
-                        _currentWeight = _maxWeight;
+                        _currentWeight -= _gcd;
+                        if (_currentWeight <= 0)
+                        {
+                            _currentWeight = _maxWeight;
+                        }
+                    }
+
+                    if (_weights[_currentIndex] >= _currentWeight)
+                    {
+                        var selectedServer = _servers[_currentIndex];
+                        
+                        _logger.Information(
+                            "Selected server {ServerUrl} (Index: {Index}, Weight: {Weight}, CurrentWeight: {CurrentWeight}, TraceId: {TraceId})",
+                            selectedServer.Url,
+                            _currentIndex,
+                            _weights[_currentIndex],
+                            _currentWeight,
+                            Activity.Current?.TraceId);
+                        
+                        return selectedServer;
                     }
                 }
-                
-                if (_weights[_currentIndex] >= _currentWeight)
-                {
-                    return _servers[_currentIndex];
-                }
+            }
+            catch (Exception e)
+            {
+                _logger.Error(e, "Error in WeightedRoundRobinStrategy.GetNextServer");
+                throw;
             }
         }
     }
