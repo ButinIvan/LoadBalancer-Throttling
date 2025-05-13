@@ -82,4 +82,18 @@
 //      }
 //    ]
 //  }
+//  "LoadBalancer" : {
+//    "Strategy": "LeastConnections",
+//    "Servers": [
+//      {
+//        "Url": "http://server1:5000"
+//      },
+//      {
+//        "Url": "http://server2:5001"
+//      },
+//      {
+//        "Url": "http://server3:5002"
+//      }
+//    ]
+//  }
 }
