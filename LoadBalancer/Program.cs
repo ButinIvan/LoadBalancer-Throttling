@@ -50,6 +50,7 @@ builder.Services.AddSingleton<ILoadBalancerStrategy>(provider =>
             config.Servers,
             httpAccessor,
             HashBasedStrategy.HashMode.Url),
+        "LeastConnections" => new LeastConnectionsStrategy(config.Servers),
         _ => new RoundRobinStrategy(config.Servers)
     };
 });
@@ -61,18 +62,41 @@ async Task<IResult> HandleRequest(
     ILoadBalancerStrategy strategy,
     HttpClient httpClient)
 {
-    var server = strategy.GetNextServer();
-    try
+    if (strategy is not LeastConnectionsStrategy lcStrategy)
     {
-        var response = await httpClient.GetAsync(server.Url);
-        response.EnsureSuccessStatusCode();
-        return Results.Text(await response.Content.ReadAsStringAsync());
+        var server = strategy.GetNextServer();
+        try
+        {
+            var response = await httpClient.GetAsync(server.Url);
+            response.EnsureSuccessStatusCode();
+            return Results.Text(await response.Content.ReadAsStringAsync());
+        }
+        catch (HttpRequestException ex)
+        {
+            return Results.Problem(
+                detail: $"Ошибка соединения с сервером {server.Url}: {ex.Message}",
+                statusCode: StatusCodes.Status502BadGateway);
+        }
     }
-    catch (HttpRequestException ex)
+    else
     {
-        return Results.Problem(
-            detail: $"Ошибка соединения с сервером {server.Url}: {ex.Message}",
-            statusCode: StatusCodes.Status502BadGateway);
+        var server = lcStrategy.GetNextServer();
+        try
+        {
+            var response = await httpClient.GetAsync(server.Url);
+            response.EnsureSuccessStatusCode();
+            return Results.Text(await response.Content.ReadAsStringAsync());
+        }
+        catch (HttpRequestException ex)
+        {
+            return Results.Problem(
+                detail: $"Ошибка соединения с сервером {server.Url}: {ex.Message}",
+                statusCode: StatusCodes.Status502BadGateway);
+        }
+        finally
+        {
+            lcStrategy.ReleaseConnection(server);
+        }
     }
 }
 
