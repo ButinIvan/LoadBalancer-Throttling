@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Net.Quic;
 using LoadBalancer.Configurations;
 using LoadBalancer.Strategies;
 using LoadBalancer.Strategies.Implementations;
@@ -18,7 +17,7 @@ Log.Logger = new LoggerConfiguration()
     .Enrich.WithSpan()
     .WriteTo.Console(outputTemplate: 
         "{Timestamp:HH:mm:ss} [{Level}] TraceId: {TraceId} | {Message}{NewLine}{Exception}")
-    .WriteTo.Seq("http://localhost:5341")
+    .WriteTo.Seq(Environment.GetEnvironmentVariable("SEQ_URL") ?? "http://0.0.0.0:5343")
     .CreateBootstrapLogger();
 
 try
@@ -32,7 +31,7 @@ try
             .Enrich.FromLogContext()
             .Enrich.WithSpan()
             .WriteTo.Console()
-            .WriteTo.Seq("http://localhost:5341"));
+            .WriteTo.Seq(Environment.GetEnvironmentVariable("SEQ_URL") ?? "http://0.0.0.0:5343"));
 
     builder.Services.AddHttpClient();
     builder.Services.AddHttpContextAccessor();
@@ -45,15 +44,18 @@ try
     builder.Services.AddSingleton<IThrottlingStrategy>(provider =>
     {
         var config = provider.GetRequiredService<IOptions<ThrottlingConfig>>().Value;
+        var logger = provider.GetRequiredService<ILogger>();
 
         return config.Strategy switch
         { 
             "RejectingSlidingWindow" => new RejectingSlidingWindowStrategy(
                 config.WindowSize,
-                config.RequestLimit),
+                config.RequestLimit,
+                logger),
             _ => new RejectingSlidingWindowStrategy(
                 config.WindowSize,
-                config.RequestLimit),
+                config.RequestLimit,
+                logger),
         };
     });
 
@@ -112,23 +114,23 @@ try
     {
         using var activity = Activity.Current?.Source.StartActivity("LoadBalancer.HandleRequest");
         
-        logger.LogInformation("Начало обработки запроса {Path}", context.Request.Path);
+        logger.LogInformation("Start processing request {Path}", context.Request.Path);
         
         var server = strategy.GetNextServer();
-        logger.LogInformation("Выбран сервер: {ServerUrl}", server.Url);
+        logger.LogInformation("Server selected: {ServerUrl}", server.Url);
         
         try
         {
             var response = await httpClient.GetAsync(server.Url);
             response.EnsureSuccessStatusCode();
-            logger.LogInformation("Успешный ответ от сервера {ServerUrl}", server.Url);
+            logger.LogInformation("Successful response from the server {ServerUrl}", server.Url);
             return Results.Text(await response.Content.ReadAsStringAsync());
         }
         catch (HttpRequestException e)
         {
-            logger.LogError(e, "Ошибка соединения с сервером {server.Url}", server.Url);
+            logger.LogError(e, "Error connecting to server {server.Url}", server.Url);
             return Results.Problem(
-                detail: $"Ошибка соединения с сервером {server.Url}: {e.Message}",
+                detail: $"Error connecting to server {server.Url}: {e.Message}",
                 statusCode: StatusCodes.Status502BadGateway);
         }
     }
@@ -136,14 +138,19 @@ try
     app.Use(async (context, next) =>
     {
         var throttlingStrategy = context.RequestServices.GetRequiredService<IThrottlingStrategy>();
+        var logger = context.RequestServices.GetRequiredService<ILogger>();
 
         if (!throttlingStrategy.TryProcessRequest())
         {
+            logger.Warning("Request throttled - too many requests from {ClientIp}", 
+                context.Connection.RemoteIpAddress?.ToString());
+            
             context.Response.StatusCode = StatusCodes.Status429TooManyRequests;
-            await context.Response.WriteAsync("Сервер перегружен, попробуйте еще раз позже");
+            await context.Response.WriteAsync("The server is busy. Please, try again later");
             return;
         }
 
+        logger.Debug("Request allowed by throttling strategy");
         await next();
     });
 
@@ -153,7 +160,7 @@ try
 }
 catch (Exception e)
 {
-    Log.Fatal(e, "Работа приложения завершилась");
+    Log.Fatal(e, "The application has terminated");
 }
 finally
 {
