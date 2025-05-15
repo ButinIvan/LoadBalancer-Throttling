@@ -29,7 +29,7 @@ public static class RequestHandler
         }
         catch (HttpRequestException e)
         {
-            logger.Error(e, "Error connecting to server {server.Url}", server.Url);
+            logger.Error(e, "Error connecting to server {ServerUrl}", server.Url);
             
             return Results.Problem(
                 detail: $"Error connecting to server {server.Url}: {e.Message}",

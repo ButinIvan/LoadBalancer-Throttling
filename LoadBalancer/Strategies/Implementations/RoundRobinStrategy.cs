@@ -26,11 +26,10 @@ public class RoundRobinStrategy : ILoadBalancerStrategy
             {
                 var server = _servers[_currentIndex];
                 _currentIndex = (_currentIndex + 1) % _servers.Length;
-            
-                _logger.Information("Selected server {ServerUrl} (Index: {Index}, TraceId: {TraceId})",
+                
+                _logger.Information("Selected server {ServerUrl} (Index: {Index})",
                     server.Url,
-                    _currentIndex,
-                    Activity.Current?.TraceId);
+                    _currentIndex);
             
                 return server;
             }

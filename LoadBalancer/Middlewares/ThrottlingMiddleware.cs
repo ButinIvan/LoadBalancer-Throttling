@@ -27,7 +27,7 @@ public class ThrottlingMiddleware
             return;
         }
 
-        logger.Debug("Request allowed by throttling strategy");
+        logger.Debug("Request allowed by throttler");
         await _next(context);
     }
 }

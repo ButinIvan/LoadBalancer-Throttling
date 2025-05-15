@@ -15,7 +15,7 @@ public static class LoggerConfig
             .Enrich.FromLogContext()
             .Enrich.WithSpan()
             .WriteTo.Console(outputTemplate: 
-                "{Timestamp:HH:mm:ss} [{Level}] TraceId: {TraceId} | {Message}{NewLine}{Exception}")
+                "{Timestamp:HH:mm:ss} [{Level}] TraceId: {TraceId} | {Message} {NewLine} {Exception}")
             .WriteTo.Seq(Environment.GetEnvironmentVariable("SEQ_URL") ?? "http://seq:5343")
             .CreateBootstrapLogger();
     }

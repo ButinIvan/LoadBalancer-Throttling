@@ -27,7 +27,7 @@ public class StickyRoundRobinStrategy : ILoadBalancerStrategy
         _sessions = new ConcurrentDictionary<string, (ServerConfig, DateTime)>();
         _roundRobin = new RoundRobinStrategy(_servers, _logger);
         
-        _logger.Debug("Initialized with session duration {Duration}", duration);
+        _logger.Debug("Initialized with {ServerCount} servers, session duration {Duration}", servers.Length, duration);
     }
 
     public ServerConfig GetNextServer()
@@ -35,7 +35,7 @@ public class StickyRoundRobinStrategy : ILoadBalancerStrategy
         try
         {
             var clientId = GetClientIdentifier();
-            _logger.Debug("Client identifier: {ClientId}", clientId);
+            _logger.Debug("Client id: {ClientId}", clientId);
 
             if (_sessions.TryGetValue(clientId, out var session) && session.expiry > DateTime.UtcNow)
             {
@@ -77,7 +77,7 @@ public class StickyRoundRobinStrategy : ILoadBalancerStrategy
         var ipAddress = context?.Connection.RemoteIpAddress?.ToString();
         if (!string.IsNullOrEmpty(ipAddress))
         {
-            _logger.Debug("Using IP address as identifier: {IpAddress}", ipAddress);
+            _logger.Debug("Using IP address as id: {IpAddress}", ipAddress);
             return ipAddress;
         }
 
@@ -89,7 +89,7 @@ public class StickyRoundRobinStrategy : ILoadBalancerStrategy
             SameSite = SameSiteMode.Lax
         });
 
-        _logger.Debug("Generated new client identifier: {NewId}", newId);
+        _logger.Debug("Generated new client id: {NewId}", newId);
         return newId;
     }
 }

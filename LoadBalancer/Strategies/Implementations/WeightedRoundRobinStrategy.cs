@@ -53,12 +53,11 @@ public class WeightedRoundRobinStrategy : ILoadBalancerStrategy
                         var selectedServer = _servers[_currentIndex];
                         
                         _logger.Information(
-                            "Selected server {ServerUrl} (Index: {Index}, Weight: {Weight}, CurrentWeight: {CurrentWeight}, TraceId: {TraceId})",
+                            "Selected server {ServerUrl} (Index: {Index}, Weight: {Weight}, CurrentWeight: {CurrentWeight})",
                             selectedServer.Url,
                             _currentIndex,
                             _weights[_currentIndex],
-                            _currentWeight,
-                            Activity.Current?.TraceId);
+                            _currentWeight);
                         
                         return selectedServer;
                     }
