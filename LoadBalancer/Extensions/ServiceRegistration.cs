@@ -20,6 +20,12 @@ public static class ServiceRegistration
             var httpAccessor = provider.GetRequiredService<IHttpContextAccessor>();
             var logger = provider.GetRequiredService<ILogger>();
 
+            if (config.Servers.Length == 0)
+            {
+                logger.Fatal("The server list cannot be empty. Check the configuration in config.json. ");
+                throw new ArgumentException("Invalid config.json: server list is empty.");
+            }
+            
             return config.Strategy switch
             {
                 "RoundRobin" => new RoundRobinStrategy(
