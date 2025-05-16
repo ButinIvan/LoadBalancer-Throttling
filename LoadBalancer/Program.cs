@@ -1,119 +1,50 @@
-using System.Net.Quic;
 using LoadBalancer.Configurations;
-using LoadBalancer.Strategies;
-using LoadBalancer.Strategies.Implementations;
-using LoadBalancer.Throttling;
-using LoadBalancer.Throttling.Implementations;
-using Microsoft.Extensions.Options;
+using LoadBalancer.Extensions;
+using LoadBalancer.Handlers;
+using LoadBalancer.Middleware;
+using Serilog;
+using ILogger = Serilog.ILogger;
 
-var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddHttpClient();
-builder.Services.AddHttpContextAccessor();
-builder.Configuration.AddJsonFile("config.json", optional: false, reloadOnChange: true);
-builder.Services.Configure<LoadBalancerConfig>(
-    builder.Configuration.GetSection("LoadBalancer"));
-builder.Services.Configure<ThrottlingConfig>(
-    builder.Configuration.GetSection("Throttling"));
+Log.Logger = LoggerConfig.CreateBootstrapLogger();
 
-builder.Services.AddSingleton<IThrottlingStrategy>(provider =>
+try
 {
-    var config = provider.GetRequiredService<IOptions<ThrottlingConfig>>().Value;
+    var builder = WebApplication.CreateBuilder(args);
+    
+    LoggerConfig.ConfigureSerilog(builder);
+    
+    builder.Services.AddSingleton<ILogger>(_ => Log.Logger);
+    builder.Services.AddHttpClient();
+    builder.Services.AddHttpContextAccessor();
+    
+    builder.Configuration.AddJsonFile("config.json", optional: false, reloadOnChange: true);
+    
+    builder.Services.AddLoadBalancerStrategy(builder.Configuration);
+    builder.Services.AddThrottlingStrategy(builder.Configuration);
+    
+    var app = builder.Build();
 
-    return config.Strategy switch
+    app.UseSerilogRequestLogging(options =>
     {
-        "RejectingSlidingWindow" => new RejectingSlidingWindowStrategy(
-            config.WindowSize,
-            config.RequestLimit),
-        _ => new RejectingSlidingWindowStrategy(
-            config.WindowSize,
-            config.RequestLimit),
-    };
-});
-
-builder.Services.AddSingleton<ILoadBalancerStrategy>(provider =>
-{
-    var config = provider.GetRequiredService<IOptions<LoadBalancerConfig>>().Value;
-    var httpAccessor = provider.GetRequiredService<IHttpContextAccessor>();
-    return config.Strategy switch
-    {
-        "RoundRobin" => new RoundRobinStrategy(config.Servers),
-        "WeightedRoundRobin" => new WeightedRoundRobinStrategy(config.Servers),
-        "StickyRoundRobin" => new StickyRoundRobinStrategy(
-            config.Servers,
-            httpAccessor,
-            config.Duration),
-        "IpHash" => new HashBasedStrategy(
-            config.Servers,
-            httpAccessor),
-        "UrlHash" => new HashBasedStrategy(
-            config.Servers,
-            httpAccessor,
-            HashBasedStrategy.HashMode.Url),
-        "LeastConnections" => new LeastConnectionsStrategy(config.Servers),
-        _ => new RoundRobinStrategy(config.Servers)
-    };
-});
-
-var app = builder.Build();
-
-async Task<IResult> HandleRequest(
-    HttpContext context,
-    ILoadBalancerStrategy strategy,
-    HttpClient httpClient)
-{
-    if (strategy is not LeastConnectionsStrategy lcStrategy)
-    {
-        var server = strategy.GetNextServer();
-        try
+        options.EnrichDiagnosticContext = ((context, httpContext) =>
         {
-            var response = await httpClient.GetAsync(server.Url);
-            response.EnsureSuccessStatusCode();
-            return Results.Text(await response.Content.ReadAsStringAsync());
-        }
-        catch (HttpRequestException ex)
-        {
-            return Results.Problem(
-                detail: $"Ошибка соединения с сервером {server.Url}: {ex.Message}",
-                statusCode: StatusCodes.Status502BadGateway);
-        }
-    }
-    else
-    {
-        var server = lcStrategy.GetNextServer();
-        try
-        {
-            var response = await httpClient.GetAsync(server.Url);
-            response.EnsureSuccessStatusCode();
-            return Results.Text(await response.Content.ReadAsStringAsync());
-        }
-        catch (HttpRequestException ex)
-        {
-            return Results.Problem(
-                detail: $"Ошибка соединения с сервером {server.Url}: {ex.Message}",
-                statusCode: StatusCodes.Status502BadGateway);
-        }
-        finally
-        {
-            lcStrategy.ReleaseConnection(server);
-        }
-    }
+            context.Set("ClientIp", httpContext.Connection.RemoteIpAddress?.ToString());
+            context.Set("UserAgent", httpContext.Request.Headers.UserAgent);
+        });
+    });
+    
+    app.UseMiddleware<ThrottlingMiddleware>();
+    
+    app.MapGet("/", RequestHandler.HandleRequest);
+    
+    app.Run("http://0.0.0.0:8080");
 }
-
-app.Use(async (context, next) =>
+catch (Exception e)
 {
-    var throttlingStrategy = context.RequestServices.GetRequiredService<IThrottlingStrategy>();
-
-    if (!throttlingStrategy.TryProcessRequest())
-    {
-        context.Response.StatusCode = StatusCodes.Status429TooManyRequests;
-        await context.Response.WriteAsync("Сервер перегружен, попробуйте еще раз позже");
-        return;
-    }
-
-    await next();
-});
-
-app.MapGet("/", HandleRequest);
-
-app.Run("http://0.0.0.0:8080");
+    Log.Fatal(e, "The application has terminated");
+}
+finally
+{
+    Log.CloseAndFlush();
+}

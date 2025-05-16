@@ -1,4 +1,14 @@
 ﻿services:
+  seq:
+    image: datalust/seq:latest
+    container_name: seq
+    ports:
+      - 5343:80
+    environment:
+      - ACCEPT_EULA=Y
+    volumes:
+      - /data
+    
   loadbalancer:
     image: loadbalancer
     build:
@@ -8,7 +18,10 @@
       - "8080:8080"
     volumes:
       - ./LoadBalancer/config.json:/app/config.json
+    environment:
+    - SEQ_URL=http://0.0.0.0:5344
     depends_on:
+      - seq
       - server1
       - server2
       - server3

@@ -1,3 +1,5 @@
+using ILogger = Serilog.ILogger;
+
 namespace LoadBalancer.Throttling.Implementations;
 
 public class RejectingSlidingWindowStrategy : IThrottlingStrategy
@@ -6,11 +8,19 @@ public class RejectingSlidingWindowStrategy : IThrottlingStrategy
     private readonly object _lock = new();
     private readonly TimeSpan _windowSize;
     private readonly int _requestLimit;
+    private readonly ILogger _logger;
 
-    public RejectingSlidingWindowStrategy(TimeSpan windowSize, int requestLimit)
+    public RejectingSlidingWindowStrategy(
+        TimeSpan windowSize,
+        int requestLimit,
+        ILogger logger)
     {
         _windowSize = windowSize;
         _requestLimit = requestLimit;
+        _logger = logger;
+        
+        _logger.Debug("Initialized with WindowSize: {WindowSize}, RequestLimit: {RequestLimit}", 
+            windowSize, requestLimit);
     }
 
     public bool TryProcessRequest()
@@ -20,17 +30,27 @@ public class RejectingSlidingWindowStrategy : IThrottlingStrategy
 
         lock (_lock)
         {
+            int removedCount = 0;
             while (_requestTimestamps.Count > 0 && _requestTimestamps.Peek() < windowStart)
             {
                 _requestTimestamps.Dequeue();
+                removedCount++;
             }
             
-            if (_requestTimestamps.Count >= _requestLimit)
+            if (removedCount > 0)
+                _logger.Debug("Removed {RemovedCount} old request from window", removedCount);
+            
+            var currentCount = _requestTimestamps.Count;
+            if (currentCount >= _requestLimit)
             {
+                _logger.Warning("Request rejected (Current: {CurrentCount}, Limit: {RequestLimit})", 
+                    currentCount, _requestLimit);
                 return false;
             }
             
             _requestTimestamps.Enqueue(now);
+            _logger.Debug("Request accepted (Current: {CurrentCount}, Limit: {RequestLimit})", 
+                currentCount + 1, _requestLimit);
             return true;
         }
     }
