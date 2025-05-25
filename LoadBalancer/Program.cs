@@ -1,7 +1,7 @@
 using LoadBalancer.Configurations;
 using LoadBalancer.Extensions;
-using LoadBalancer.Handlers;
 using LoadBalancer.Middleware;
+using LoadBalancer.Middlewares;
 using Serilog;
 using ILogger = Serilog.ILogger;
 
@@ -35,8 +35,7 @@ try
     });
     
     app.UseMiddleware<ThrottlingMiddleware>();
-    
-    app.MapGet("/", RequestHandler.HandleRequest);
+    app.UseMiddleware<RequestForwardingMiddleware>();
     
     app.Run("http://0.0.0.0:8080");
 }

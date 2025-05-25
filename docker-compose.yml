@@ -19,7 +19,7 @@
     volumes:
       - ./LoadBalancer/config.json:/app/config.json
     environment:
-    - SEQ_URL=http://0.0.0.0:5344
+    - SEQ_URL=http://0.0.0.0:5343
     depends_on:
       - seq
       - server1
@@ -27,34 +27,22 @@
       - server3
 
   server1:
-    image: server1
-    build:
-      context: .
-      dockerfile: Server/Dockerfile
+    image: kennethreitz/httpbin:latest
     environment:
-      - PORT=5000
       - SERVER_ID=server1
     expose:
-      - "5000"
+      - "5000:80"
 
   server2:
-    image: server2
-    build:
-      context: .
-      dockerfile: Server/Dockerfile
+    image: kennethreitz/httpbin:latest
     environment:
-      - PORT=5001
-      - SERVER_ID=server2
+      - SERVER_ID=server1
     expose:
-      - "5001"
+      - "5001:80"
 
   server3:
-    image: server3
-    build:
-      context: .
-      dockerfile: Server/Dockerfile
+    image: kennethreitz/httpbin:latest
     environment:
-      - PORT=5002
-      - SERVER_ID=server3
+      - SERVER_ID=server1
     expose:
-      - "5002"
+      - "5002:80"
