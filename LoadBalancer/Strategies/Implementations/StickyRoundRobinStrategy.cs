@@ -74,7 +74,8 @@ public class StickyRoundRobinStrategy : ILoadBalancerStrategy
             return stickyCookie;
         }
 
-        var ipAddress = context?.Connection.RemoteIpAddress?.ToString();
+        var ipAddress = _httpContextAccessor.HttpContext?.Request.Headers["X-Forwarded-For"].FirstOrDefault() ??
+                        context?.Connection.RemoteIpAddress?.ToString();
         if (!string.IsNullOrEmpty(ipAddress))
         {
             _logger.Debug("Using IP address as id: {IpAddress}", ipAddress);
