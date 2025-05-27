@@ -35,7 +35,8 @@ public class HashBasedStrategy : ILoadBalancerStrategy
         {
             var hashKey = _mode switch
             {
-                HashMode.Ip => _httpContextAccessor.HttpContext?.Connection.RemoteIpAddress?.ToString(),
+                HashMode.Ip => _httpContextAccessor.HttpContext?.Request.Headers["X-Forwarded-For"].FirstOrDefault() ??
+                               _httpContextAccessor.HttpContext?.Connection.RemoteIpAddress?.ToString(),
                 HashMode.Url => _httpContextAccessor.HttpContext?.Request.Path.ToString(),
                 _ => throw new InvalidOperationException("Unknown hash mode")
             } ?? "";

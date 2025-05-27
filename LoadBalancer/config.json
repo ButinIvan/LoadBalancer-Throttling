@@ -1,13 +1,13 @@
 {
   "LoadBalancer" : {
-    "Strategy": "RoundRobin",
+//    "Strategy": "RoundRobin",
 
 //    "Strategy": "WeightedRoundRobin",
     
 //    "Strategy": "StickyRoundRobin",
 //    "Duration": "00:00:15", // for sticky
 
-//    "Strategy": "IpHash",
+    "Strategy": "IpHash",
 
 //    "Strategy": "UrlHash",
 
@@ -29,7 +29,7 @@
   },
   "Throttling" : {
     "Strategy": "RejectingSlidingWindow",
-    "RequestLimit": 2,
+    "RequestLimit": 60,
     "WindowSize": "00:00:05"
   }
 }
