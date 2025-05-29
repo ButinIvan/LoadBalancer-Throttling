@@ -1,6 +1,6 @@
 {
   "LoadBalancer" : {
-    "Strategy": "RoundRobin",
+//    "Strategy": "RoundRobin",
 
 //    "Strategy": "WeightedRoundRobin",
     
@@ -11,7 +11,8 @@
 
 //    "Strategy": "UrlHash",
 
-//    "Strategy": "LeastConnections",
+    "Strategy": "LeastConnections",
+    
     "Servers": [
       {
         "Url": "http://server1:80"
@@ -29,7 +30,7 @@
   },
   "Throttling" : {
     "Strategy": "RejectingSlidingWindow",
-    "RequestLimit": 2,
+    "RequestLimit": 60,
     "WindowSize": "00:00:05"
   }
 }
