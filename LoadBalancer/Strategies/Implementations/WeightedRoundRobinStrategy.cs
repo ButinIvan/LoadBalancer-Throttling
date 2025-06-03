@@ -36,8 +36,15 @@ public class WeightedRoundRobinStrategy : ILoadBalancerStrategy
         {
             try
             {
+                var iterations = 0;
+                var maxIterations = _servers.Length * (_maxWeight / _gcd + 1);
                 while (true)
                 {
+                    if (iterations++ > maxIterations)
+                    {
+                        _logger.Error("Infinite loop detected in WeightedRoundRobinStrategy");
+                        throw new InvalidOperationException("Possible infinite loop detected in server selection");
+                    }
                     _currentIndex = (_currentIndex + 1) % _servers.Length;
                     if (_currentIndex == 0)
                     {

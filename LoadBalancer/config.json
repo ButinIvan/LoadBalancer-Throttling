@@ -1,17 +1,17 @@
 {
   "LoadBalancer" : {
-//    "Strategy": "RoundRobin",
+    "Strategy": "RoundRobin",
 
 //    "Strategy": "WeightedRoundRobin",
     
 //    "Strategy": "StickyRoundRobin",
-//    "Duration": "00:00:15", // for sticky
+//    "Duration": "00:00:15",
 
 //    "Strategy": "IpHash",
 
 //    "Strategy": "UrlHash",
 
-    "Strategy": "LeastConnections",
+//    "Strategy": "LeastConnections",
     "Servers": [
       {
         "Url": "http://server1:80"
@@ -29,7 +29,7 @@
   },
   "Throttling" : {
     "Strategy": "RejectingSlidingWindow",
-    "RequestLimit": 12,
+    "RequestLimit": 2,
     "WindowSize": "00:00:05"
   }
 }

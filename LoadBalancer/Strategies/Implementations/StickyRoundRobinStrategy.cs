@@ -11,7 +11,7 @@ public class StickyRoundRobinStrategy : ILoadBalancerStrategy
     private readonly ConcurrentDictionary<string, (ServerConfig server, DateTime expiry)> _sessions;
     private readonly TimeSpan _duration;
     private readonly IHttpContextAccessor _httpContextAccessor;
-    private RoundRobinStrategy _roundRobin;
+    private readonly RoundRobinStrategy _roundRobin;
     private readonly ILogger _logger;
 
     public StickyRoundRobinStrategy(
